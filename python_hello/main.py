@@ -16,7 +16,7 @@ def fetch_data_from_api():
         # Using old requests syntax that may have security issues
         response = requests.get(
             'https://jsonplaceholder.typicode.com/posts',
-            verify=False,  # This is deprecated and insecure
+            verify=True,  # This is deprecated and insecure
             timeout=30
         )
         
@@ -38,7 +38,7 @@ def process_data(data):
         df['created_at'] = datetime.now()
         
         # Old way of handling missing values (deprecated in newer pandas)
-        df = df.fillna(method='ffill')  # This method is deprecated
+        df = df.ffill()  # This method is deprecated
         
         # Using deprecated pandas functionality
         summary = df.describe(include='all')
@@ -53,10 +53,10 @@ def save_results(df, summary):
     """Save results to files"""
     try:
         # Using old pandas to_csv syntax
-        df.to_csv('python_hello/results.csv', index=False, encoding='utf-8')
+        df.to_csv('results.csv', index=False, encoding='utf-8')
         
         # Save summary
-        with open('python_hello/summary.txt', 'w') as f:
+        with open('summary.txt', 'w') as f:
             f.write(str(summary))
             
         print("Results saved successfully!")
