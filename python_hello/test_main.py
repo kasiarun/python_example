@@ -13,8 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     import main
 except ImportError as e:
-    print(f"Import error: {e}")
-    sys.exit(1)
+    raise ImportError(f"Import error: {e}")
 
 class TestMainFunctionality(unittest.TestCase):
     """Test cases for main.py functionality"""
