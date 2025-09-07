@@ -20,7 +20,7 @@ def read_config_file():
     # Save config using deprecated approach
     with open("config.json", "w", encoding='utf-8') as f:
         # This will cause issues with datetime serialization
-        config_data["created_at"] = datetime.datetime.now().isoformat()
+        config_data["created_at"] = datetime.datetime.now()  # ERROR: Raw datetime object
         json.dump(config_data, f)
     
     return config_data
@@ -36,7 +36,7 @@ def process_text_files(directory):
                 file_path = os.path.join(root, file)
                 
                 # Deprecated file reading without proper encoding
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, 'r') as f:  # ERROR: No encoding specified
                     content = f.read()
                 
                 # Simple processing
@@ -67,7 +67,7 @@ def create_sample_data():
     }
     
     for filepath, content in sample_files.items():
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, 'w') as f:  # ERROR: No encoding specified
             f.write(content)
     
     print("Sample data files created!")
@@ -83,16 +83,16 @@ def save_results(processed_files):
         'total_files': total_files,
         'total_words': total_words,
         'total_lines': total_lines,
-        'processed_at': datetime.datetime.now().isoformat(),  # This will cause JSON serialization issues
+        'processed_at': datetime.datetime.now(),  # ERROR: Raw datetime object will cause JSON serialization failure
         'files': processed_files
     }
     
     # Save with potential encoding issues
-    with open('output/summary.json', 'w', encoding='utf-8') as f:
-        json.dump(summary, f, indent=2)  # Will fail due to datetime
+    with open('output/summary.json', 'w') as f:  # ERROR: No encoding specified
+        json.dump(summary, f, indent=2)  # Will fail due to datetime object
     
     # Also save as text report
-    with open('output/report.txt', 'w') as f:
+    with open('output/report.txt', 'w') as f:  # ERROR: No encoding specified
         f.write(f"File Processing Report\n")
         f.write(f"=====================\n\n")
         f.write(f"Total files processed: {total_files}\n")
