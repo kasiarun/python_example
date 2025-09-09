@@ -244,8 +244,8 @@ Please provide specific fixes as JSON."""
             return []
     
     async def apply_fixes(self, state: AgentState) -> AgentState:
-        """Apply the generated fixes to files"""
-        print(f"⚡ {self.name}: Applying fixes")
+        """Apply the generated fixes to new files"""
+        print(f"⚡ {self.name}: Applying fixes to new files")
         
         suggested_fixes = state["suggested_fixes"]
         applied_changes = []
@@ -258,7 +258,7 @@ Please provide specific fixes as JSON."""
                 fixes_by_file[file_path] = []
             fixes_by_file[file_path].append(fix)
         
-        # Apply fixes to each file
+        # Apply fixes to each file and create new fixed versions
         for file_path, file_fixes in fixes_by_file.items():
             try:
                 with open(file_path, 'r') as f:
@@ -276,11 +276,16 @@ Please provide specific fixes as JSON."""
                             content = content.replace(original_code, fixed_code)
                             applied_changes.append(f"Fixed {fix.get('explanation', 'issue')} in {file_path}")
                 
-                # Write back if changes were made
+                # Write to new file if changes were made
                 if content != original_content:
-                    with open(file_path, 'w') as f:
+                    # Create new filename with _fixed suffix
+                    path_obj = Path(file_path)
+                    new_file_path = path_obj.parent / f"{path_obj.stem}_fixed{path_obj.suffix}"
+                    
+                    with open(new_file_path, 'w') as f:
                         f.write(content)
-                    print(f"Applied fixes to {file_path}")
+                    print(f"Created fixed version: {new_file_path}")
+                    applied_changes.append(f"Created fixed version: {new_file_path}")
                 
             except Exception as e:
                 print(f"Error applying fixes to {file_path}: {e}")
@@ -297,16 +302,23 @@ class SmartTestRunnerAgent:
         self.name = "Smart Test Runner"
     
     async def run_tests(self, state: AgentState) -> AgentState:
-        """Run tests on the fixed code"""
-        print(f"🧪 {self.name}: Testing fixed code")
+        """Run tests on both original and fixed code"""
+        print(f"🧪 {self.name}: Testing original and fixed code")
         
         repo_path = state["repository_path"]
-        test_results = {"passed": 0, "failed": 0, "errors": []}
+        test_results = {"passed": 0, "failed": 0, "errors": [], "fixed_files_tested": []}
         
-        # Find Python files to test
+        # Find Python files to test (prioritize _fixed files)
         python_files = list(Path(repo_path).rglob("*.py"))
         
-        for file_path in python_files:
+        # Separate original and fixed files
+        fixed_files = [f for f in python_files if "_fixed" in f.stem]
+        original_files = [f for f in python_files if "_fixed" not in f.stem]
+        
+        # Test fixed files first if they exist
+        files_to_test = fixed_files if fixed_files else original_files
+        
+        for file_path in files_to_test:
             try:
                 # Try to run each Python file
                 # Make path relative to the repo_path for subprocess
@@ -321,16 +333,25 @@ class SmartTestRunnerAgent:
                 
                 if result.returncode == 0:
                     test_results["passed"] += 1
+                    if "_fixed" in file_path.stem:
+                        test_results["fixed_files_tested"].append(str(file_path))
+                        print(f"✅ Fixed file runs successfully: {file_path}")
                 else:
                     test_results["failed"] += 1
                     test_results["errors"].append(f"{file_path}: {result.stderr}")
+                    if "_fixed" in file_path.stem:
+                        print(f"❌ Fixed file still has issues: {file_path}")
                     
             except Exception as e:
                 test_results["failed"] += 1
                 test_results["errors"].append(f"{file_path}: {str(e)}")
         
         state["test_results"] = test_results
-        state["messages"].append(f"Tests completed: {test_results['passed']} passed, {test_results['failed']} failed")
+        
+        if test_results["fixed_files_tested"]:
+            state["messages"].append(f"Tests completed: {test_results['passed']} passed, {test_results['failed']} failed. Fixed files tested: {len(test_results['fixed_files_tested'])}")
+        else:
+            state["messages"].append(f"Tests completed: {test_results['passed']} passed, {test_results['failed']} failed")
         
         return state
 
@@ -341,24 +362,105 @@ class GitSyncAgent:
         self.name = "Git Sync Agent"
     
     async def sync_with_github(self, state: AgentState) -> AgentState:
-        """Pull latest changes from GitHub"""
-        print(f"🔄 {self.name}: Syncing with GitHub repository")
+        """Commit local changes first, then sync with GitHub repository"""
+        print(f"🔄 {self.name}: Committing local changes and syncing with GitHub")
+        
+        repo_path = state["repository_path"]
         
         try:
-            # Pull latest changes from remote
-            result = subprocess.run(
+            # Step 1: Check for uncommitted changes and commit them
+            print("📋 Checking for uncommitted local changes...")
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if status_result.stdout.strip():
+                print("📝 Found uncommitted changes, committing them...")
+                
+                # Add all changes
+                add_result = subprocess.run(
+                    ["git", "add", "."],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if add_result.returncode == 0:
+                    # Commit with automated message
+                    commit_result = subprocess.run(
+                        ["git", "commit", "-m", "Auto-commit: Local changes before dependency analysis"],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=15
+                    )
+                    
+                    if commit_result.returncode == 0:
+                        print("✅ Successfully committed local changes")
+                        state["messages"].append("Committed local changes before analysis")
+                    else:
+                        print(f"⚠️ Git commit warning: {commit_result.stderr}")
+                        state["messages"].append(f"Git commit completed with warnings: {commit_result.stderr}")
+                else:
+                    print(f"❌ Git add failed: {add_result.stderr}")
+                    state["messages"].append(f"Git add failed: {add_result.stderr}")
+            else:
+                print("📍 No uncommitted changes found")
+                state["messages"].append("No uncommitted changes to commit")
+            
+            # Step 2: Push any local commits to remote
+            print("📤 Checking for local commits to push...")
+            ahead_result = subprocess.run(
+                ["git", "rev-list", "--count", "HEAD", "^origin/main"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            commits_ahead = int(ahead_result.stdout.strip()) if ahead_result.returncode == 0 else 0
+            
+            if commits_ahead > 0:
+                print(f"📤 Pushing {commits_ahead} local commits to remote...")
+                push_result = subprocess.run(
+                    ["git", "push", "origin", "main"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if push_result.returncode == 0:
+                    print("✅ Successfully pushed to GitHub")
+                    state["messages"].append(f"Pushed {commits_ahead} commits to GitHub")
+                else:
+                    print(f"❌ Git push failed: {push_result.stderr}")
+                    state["messages"].append(f"Git push failed: {push_result.stderr}")
+            else:
+                print("📍 No local commits to push")
+                state["messages"].append("No local commits to push")
+            
+            # Step 3: Pull latest changes from remote
+            print("📥 Pulling latest changes from remote...")
+            pull_result = subprocess.run(
                 ["git", "pull", "origin", "main"],
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=30
             )
             
-            if result.returncode == 0:
-                print("✅ Successfully synced with GitHub")
-                state["messages"].append("Synced with GitHub repository")
+            if pull_result.returncode == 0:
+                print("✅ Successfully pulled from GitHub")
+                state["messages"].append("Pulled latest changes from GitHub")
             else:
-                print(f"⚠️ Git pull warning: {result.stderr}")
-                state["messages"].append(f"Git pull completed with warnings: {result.stderr}")
+                print(f"⚠️ Git pull warning: {pull_result.stderr}")
+                state["messages"].append(f"Git pull completed with warnings: {pull_result.stderr}")
             
         except Exception as e:
             print(f"❌ Error syncing with GitHub: {e}")
