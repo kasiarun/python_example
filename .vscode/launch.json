@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug LangGraph Workflow",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/langgraph_debugger_guide.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "LANGCHAIN_TRACING_V2": "true",
+                "LANGCHAIN_PROJECT": "langgraph-debug",
+                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
+            },
+            "args": ["--debug"]
+        },
+        {
+            "name": "Debug Smart Dependency Agent",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/smart_dependency_agent.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "LANGCHAIN_TRACING_V2": "true",
+                "LANGCHAIN_PROJECT": "smart-dependency-agent",
+                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
+            }
+        }
+    ]
+}
