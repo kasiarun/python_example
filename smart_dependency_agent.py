@@ -11,6 +11,10 @@ import json
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 try:
     from langgraph.graph import StateGraph, END
@@ -305,8 +309,10 @@ class SmartTestRunnerAgent:
         for file_path in python_files:
             try:
                 # Try to run each Python file
+                # Make path relative to the repo_path for subprocess
+                relative_path = file_path.relative_to(Path(repo_path))
                 result = subprocess.run(
-                    ["python", str(file_path)],
+                    ["python", str(relative_path)],
                     cwd=repo_path,
                     capture_output=True,
                     text=True,
