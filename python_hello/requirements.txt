@@ -1,6 +1,0 @@
-# Intentionally old versions to demonstrate compatibility issues
-requests==2.25.1  # Old version with security vulnerabilities
-pandas==1.3.0     # Old version with deprecated methods
-numpy==1.19.5     # Old version that may have compatibility issues
-urllib3==1.26.5   # Old version with potential security issues
-certifi==2020.12.5  # Very old SSL certificates
