@@ -1,11 +1,8 @@
-# LangGraph and LangChain dependencies
-langgraph>=0.0.40
-langchain-openai>=0.1.0
-langchain-core>=0.1.0
-typing-extensions>=4.5.0
-
-# Environment variable management
+# Core Python dependencies for Roo Code integration
 python-dotenv>=1.0.0
+
+# LangSmith tracing (optional but recommended)
+langsmith>=0.1.0
 
 # Additional utilities
 pathlib2>=2.3.7; python_version < "3.4"
